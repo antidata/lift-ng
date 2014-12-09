@@ -12,6 +12,8 @@ case class Message(msg:String) extends NgModel
 
 class CounterSessionBindActor extends SimpleNgModelBinder[Counter] ("count", Counter(0)) with BindingToClient with SessionScope
 
+class CounterSessionFactoryBindActor extends SimpleNgModelBinder[Counter] ("count", Counter(0)) with BindingToClient with SessionScope
+
 object C2sMessageHandler extends (Message => Message) {
   def apply(m:Message) = {
     for {
