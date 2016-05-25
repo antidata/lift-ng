@@ -10,3 +10,5 @@ addSbtPlugin("me.lessis" % "ls-sbt" % "0.1.3")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-pgp" % "0.8.3")
 
+addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-M12")
+
