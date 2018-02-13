@@ -1,39 +1,40 @@
 package net.liftmodules.ng
 
 import Angular._
-
+import FutureConversions._
 import net.liftweb._
 import json._
 import actor.LAFuture
 import common._
 
+import scala.concurrent.ExecutionContext
+
 object LAFutureSerializer {
-  def laFuture2JValue[T](formats: Formats, future: LAFuture[Box[T]]) = {
+  def laFuture2JValue[T](formats: Formats, future: LAFuture[Box[T]])(implicit ec: ExecutionContext) = {
     implicit val f = formats + new LAFutureSerializer
 
     val id = rand
     val flagField = JField("net.liftmodules.ng.Angular.future", JString(id))
-    val fields = flagField +:
-      (if (!future.isSatisfied) {
-        plumbFuture(future, id)
-        List()
+    val valObj: JObject =
+      if (!future.isSatisfied) {
+        plumbFuture(future.asScala, id)
+        JObject(List(JField("state", JString("pending"))))
       } else {
-        future.get match {
-          case Full(data) => List(JField("data", Extraction.decompose(data)))
-          case Failure(msg, _, _) => List(JField("msg", JString(msg)))
-          case Empty => List()
-        }
-      })
+        val box = future.get
+        val promise = Angular.DefaultApiSuccessMapper.boxToPromise(box)
+        val json = promiseToJson(promise)
+        json
+      }
 
-    JObject(fields)
+    JObject(List(flagField)) merge valObj
   }
 
-  def laFutureSerializer(formats: Formats): PartialFunction[Any, JValue] = {
-    case future: LAFuture[Box[_]] => laFuture2JValue(formats, future)
+  def laFutureSerializer(formats: Formats, ec: ExecutionContext): PartialFunction[Any, JValue] = {
+    case future: LAFuture[_] => laFuture2JValue(formats, future.asInstanceOf[LAFuture[Box[Any]]])(ec)
   }
 
 }
-class LAFutureSerializer[T <: NgModel : Manifest] extends Serializer[LAFuture[Box[T]]] with ScalaFutureSerializer {
+class LAFutureSerializer[T : Manifest] extends Serializer[LAFuture[Box[T]]] with ScalaFutureSerializer {
   import LAFutureSerializer._
   import AngularExecutionContext._
 
@@ -47,7 +48,7 @@ class LAFutureSerializer[T <: NgModel : Manifest] extends Serializer[LAFuture[Bo
 
   // The stuff below was copy/pasted from CustomSerializer.  Because we need to recursively call ourselves,
   // it's not possible to use CustomSerializer.
-  val Class = implicitly[Manifest[LAFuture[Box[T]]]].erasure
+  val Class = implicitly[Manifest[LAFuture[Box[T]]]].runtimeClass
 
   def deserialize(implicit format: Formats) = {
     case (TypeInfo(Class, _), json) =>
@@ -55,5 +56,5 @@ class LAFutureSerializer[T <: NgModel : Manifest] extends Serializer[LAFuture[Bo
       else throw new MappingException("Can't convert " + json + " to " + Class)
   }
 
-  def serialize(implicit format: Formats) = laFutureSerializer(format) orElse scalaFutureSerializer(format)
+  def serialize(implicit format: Formats) = laFutureSerializer(format, ec) orElse scalaFutureSerializer(format)
 }

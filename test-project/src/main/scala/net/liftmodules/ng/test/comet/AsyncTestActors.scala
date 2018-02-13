@@ -9,6 +9,7 @@ import util._
 import Helpers._
 import java.util.concurrent.ScheduledFuture
 import net.liftmodules.ng.test.snippet.EmbeddedFuturesSnips
+import scala.concurrent.ExecutionContext.Implicits.global
 
 abstract class AsyncTestActor extends AngularActor with Loggable {
   self =>
@@ -80,12 +81,10 @@ class EarlyEmitActor extends AngularActor { self =>
 
   override def lowPriority = {
     case "go" => go
-    case i:Int => println("emitting"); rootScope.emit("earlyEmit", i.toString)
+    case i:Int => println(s"emitting $i"); rootScope.emit("earlyEmit", i.toString)
   }
 
-  self ! nums.next()
-
-  def go = for(t <- 500 to 1500 by 500) {
+  def go = for(t <- 500 to 2000 by 500) {
     Schedule(() => {self ! nums.next()}, t.millis)
   }
 
@@ -114,7 +113,7 @@ class AssignmentActor extends AngularActor {
 class EmbeddedFutureActor extends AngularActor {
   override def lowPriority = {
     case "go" => {
-      EmbeddedFuturesSnips.buildFuture.foreach(_.foreach(scope.emit("embedded", _)))
+      EmbeddedFuturesSnips.buildFuture.foreach(scope.emit("embedded", _))
     }
   }
 }

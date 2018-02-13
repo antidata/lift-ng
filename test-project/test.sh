@@ -1,7 +1,8 @@
 #!/bin/bash
 
+ARGS="-Dnet.liftmodules.ng.test.browser=chrome -Dwebdriver.chrome.driver=$HOME/tools/selenium/chromedriver"
 TASKS="clean update test"
-MULLIGANS=5
+MULLIGANS=3
 
 run_tests() {
   run_tests_rec $1 $2 $MULLIGANS
@@ -18,8 +19,11 @@ run_tests_rec () {
   scala=$2
   mulligans=$3
 
-  sbt -Dlift.version=$lift -Dscala.version=$scala $TASKS
+  sbt -Dlift.version=$lift -Dscala.version=$scala $ARGS $TASKS
   status=$?
+
+  # Kill any zombie chromedrivers
+  ps -ef | grep chromedriver | awk '{print $2}' | xargs kill -9
 
   if [ $status -ne 0 -a $mulligans -gt 0 ]
   then
@@ -31,9 +35,12 @@ run_tests_rec () {
   return $status
 }
 
-run_tests "3.0-RC3" "2.11.7"
-run_tests "2.6.3" "2.11.7"
-run_tests "2.6.3" "2.10.5"
-run_tests "2.5.4" "2.10.5"
+run_tests "3.2.0" "2.12.4"
+run_tests "3.2.0" "2.11.12"
+run_tests "3.1.0" "2.12.4"
+run_tests "3.1.0" "2.11.12"
+run_tests "3.0.1" "2.12.4"
+run_tests "3.0.1" "2.11.12"
+run_tests "2.6.3" "2.11.12"
 
 exit $?

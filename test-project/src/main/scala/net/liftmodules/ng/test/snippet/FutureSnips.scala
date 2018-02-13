@@ -3,16 +3,20 @@ package test.snippet
 
 import Angular._
 import test.model.Test2Obj
-
 import net.liftweb._
 import common._
 import actor.LAFuture
+import net.liftweb.json.DefaultFormats
 import util.Schedule
 import util.Helpers._
 
 import scala.xml.NodeSeq
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object FutureSnips extends Loggable {
+  implicit val formats = DefaultFormats
+
   def services(xhtml:NodeSeq) = renderIfNotAlreadyDefined(
     angular.module("Futures").factory("futureServices", jsObjFactory()
       .future("noArg", {
@@ -27,7 +31,7 @@ object FutureSnips extends Loggable {
       })
       .defFutureAny("exception", {
         throw new Exception("FromServerFutureException")
-      })
+      }.asInstanceOf[Future[Any]])
       .future("stringArg", (arg:String) => {
         val f = new LAFuture[Box[String]]()
         Schedule.schedule(() => f.satisfy(Full("FromFuture: "+arg)), 1 second)
@@ -52,7 +56,6 @@ object FutureSnips extends Loggable {
       .future("scalaFuture", {
         import FutureConversions._
         import scala.concurrent. { Promise => ScalaPromise, Future }
-        import scala.concurrent.ExecutionContext.Implicits.global
         import scala.util.Try
 
         val p = ScalaPromise[String]()

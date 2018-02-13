@@ -4,12 +4,15 @@ package test.snippet
 import Angular._
 import net.liftweb.actor.LAFuture
 import net.liftmodules.ng.test.model.StringInt
-import net.liftweb.common.{Empty, Failure, Full, Box}
-import net.liftweb.json.JsonAST.{JValue, JNull}
+import net.liftweb.common.{Box, Empty, Failure, Full}
+import net.liftweb.json.JsonAST.{JNull, JValue}
 import net.liftweb.util.Schedule
 import net.liftweb.util.Helpers._
 import net.liftweb.http.S
-import scala.concurrent.{ Future, Promise => ScalaPromise }
+import net.liftweb.json.DefaultFormats
+
+import scala.concurrent.{Future, Promise => ScalaPromise}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 
 case class EmbeddedFutures(
@@ -20,31 +23,34 @@ case class EmbeddedFutures(
   arr:      List[LAFuture[Box[String]]],
   fobj:     LAFuture[Box[EmbeddedObj]],
   np:       JValue = JNull
-) extends NgModel
+)
 
 case class EmbeddedObj(
   resolved: LAFuture[Box[String]],
   failed:   LAFuture[Box[String]],
   string:   LAFuture[Box[String]],
   obj:      LAFuture[Box[StringInt]]
-) extends NgModel
+)
 
 case class EmbeddedScalaFutures(
   resolved: Future[String],
   failed:   Future[String],
   string:   Future[String],
   obj:      Future[StringInt]
-) extends NgModel
+)
 
 object EmbeddedFuturesSnips {
+  import scala.concurrent.ExecutionContext.Implicits.global
+  implicit val formats = DefaultFormats
+
   def services = renderIfNotAlreadyDefined(
     angular.module("EmbeddedFutures")
       .factory("embeddedFutureServices", jsObjFactory()
-        .future("fetch", {
+        .defFutureAny("fetch", {
           S.session.map(_.sendCometActorMessage("EmbeddedFutureActor", Empty, "go"))
           buildFuture
         })
-        .jsonCall("sfetch", { Full(buildScalaModel) })
+        .defAny("sfetch", { Full(buildScalaModel) })
       )
   )
 
@@ -91,9 +97,7 @@ object EmbeddedFuturesSnips {
   }
 
   def buildFuture = {
-    val f = new LAFuture[Box[EmbeddedFutures]]
-    f.satisfy(Full(buildModel))
-    f
+    Future.apply(buildModel)
   }
 
   def sched(f: => Unit) = {
@@ -110,8 +114,6 @@ object EmbeddedFuturesSnips {
   }
 
   def buildScalaModel = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-
     val resolved = Future("resolved")
     val failed = ScalaPromise[String]()
     sched( failed.failure(new Exception("failed")) )

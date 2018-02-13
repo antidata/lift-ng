@@ -1,7 +1,6 @@
 package net.liftmodules.ng
 
 import org.scalatest._
-import matchers.ShouldMatchers
 import net.liftweb.json.{JsonParser, Serialization, NoTypeHints}
 import Serialization.write
 import net.liftweb.actor.LAFuture
@@ -12,25 +11,26 @@ case class Test[T](f:LAFuture[Box[T]])
 case class Model(str:String, num:Int)
 case class ModelF(str:String, num:Int, f:LAFuture[Box[String]])
 
-class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
+class LAFutureSerializerSpecs extends WordSpec with Matchers {
   import AngularExecutionContext._
   implicit val formats = Serialization.formats(NoTypeHints) + new LAFutureSerializer
 
   "An LAFutureSerializer" should {
-    "map unsatisfied futures to an object with a random ID" in {
+    "map unsatisfied futures to an object with a random ID and state" in {
       val test = Test[String](new LAFuture())
       val json = write(test)
       val back = JsonParser.parse(json)
 
       back match {
         case JObject(List(JField("f", JObject(List(
-          JField("net.liftmodules.ng.Angular.future", JString(id))
+          JField("net.liftmodules.ng.Angular.future", JString(id)),
+          JField("state", JString("pending"))
         ))))) =>
         case _ => fail(back+" did not match as expected")
       }
     }
 
-    "map Empty-satisfied futures to an object with no data or id" in {
+    "map Empty-satisfied futures to an object with an id and state" in {
       val f = new LAFuture[Box[String]]
       val test = Test(f)
       f.satisfy(Empty)
@@ -40,13 +40,14 @@ class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
 
       back match {
         case JObject(List(JField("f", JObject(List(
-          JField("net.liftmodules.ng.Angular.future", JString(id))
+          JField("net.liftmodules.ng.Angular.future", JString(id)),
+          JField("state", JString("resolved"))
         ))))) =>
         case _ => fail(back+" did not match as expected")
       }
     }
 
-    "map Failure-satisfied futures to an object with a msg but no id" in {
+    "map Failure-satisfied futures to an object with an id, data, and state" in {
       val f = new LAFuture[Box[String]]
       val test = Test(f)
       f.satisfy(Failure("this failed"))
@@ -57,13 +58,14 @@ class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
       back match {
         case JObject(List(JField("f", JObject(List(
           JField("net.liftmodules.ng.Angular.future", JString(id)),
-          JField("msg", JString("this failed"))
+          JField("state", JString("rejected")),
+          JField("data", JString("this failed"))
         ))))) =>
         case _ => fail(back+" did not match as expected")
       }
     }
 
-    "map Full[String]-satisfied futures to an object with data set but no id" in {
+    "map Full[String]-satisfied futures to an object with an id, data, and state" in {
       val f = new LAFuture[Box[String]]
       val test = Test(f)
       f.satisfy(Full("the data"))
@@ -74,13 +76,14 @@ class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
       back match {
         case JObject(List(JField("f", JObject(List(
           JField("net.liftmodules.ng.Angular.future", JString(id)),
+          JField("state", JString("resolved")),
           JField("data", JString("the data"))
         ))))) =>
         case _ => fail(back+" did not match as expected")
       }
     }
 
-    "map Full[Model]-satisfied futures to an object with data set but no id" in {
+    "map Full[Model]-satisfied futures to an object with an id, data, and state" in {
       val f = new LAFuture[Box[Model]]
       val test = Test(f)
       f.satisfy(Full(Model("a string", 42)))
@@ -91,6 +94,7 @@ class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
       back match {
         case JObject(List(JField("f", JObject(List(
           JField("net.liftmodules.ng.Angular.future", JString(id)),
+          JField("state", JString("resolved")),
           JField("data", JObject(List(
             JField("str", JString("a string")),
             JField("num", JInt(int))
@@ -100,7 +104,7 @@ class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
       }
     }
 
-    "map Full[ModelF]-satisfied futures to an object with data and an embedded future" in {
+    "map Full[ModelF]-satisfied futures to an object with an id, data (with an embedded future), and state" in {
       val f = new LAFuture[Box[ModelF]]
       val test = Test(f)
       val fString = new LAFuture[Box[String]]
@@ -112,11 +116,13 @@ class LAFutureSerializerSpecs extends WordSpec with ShouldMatchers {
       back match {
         case JObject(List(JField("f", JObject(List(
           JField("net.liftmodules.ng.Angular.future", JString(id1)),
+          JField("state", JString("resolved")),
           JField("data", JObject(List(
             JField("str", JString("another string")),
             JField("num", JInt(int)),
             JField("f", JObject(List(
-              JField("net.liftmodules.ng.Angular.future", JString(id2))
+              JField("net.liftmodules.ng.Angular.future", JString(id2)),
+              JField("state", JString("pending"))
             )))
           )))
         ))))) => int should equal (43)
